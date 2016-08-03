@@ -21,6 +21,7 @@
     "http": "0.0.0",
     "mkdirp": "^0.5.1",
     "socket.io": "^1.4.8",
+    "stream-transcoder": "0.0.5",
     "tap": "^6.2.0",
     "torrent-stream": "^1.0.3",
     "webtorrent": "^0.95.5"
