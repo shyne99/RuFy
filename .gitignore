@@ -2,6 +2,7 @@
 log/
 venv/
 nodejs/node_modules
+nodejs/pid
 nodejs/assets
 *.py[cod]
 db.sqlite3
