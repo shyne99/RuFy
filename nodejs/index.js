@@ -6,6 +6,7 @@ var app = express();
 var bodyParser = require("body-parser");
 var fs = require('fs');
 var Transcoder = require ('stream-transcoder');
+child_process = require("child_process");
 var port = 3000;
 
 var client = new webtorrent();
@@ -71,6 +72,150 @@ app.post('/streamtorrent/add', function(request, response, next) {
         console.log("adding torrent failed");
     }
 });
+/*app.get('/streamtorrent/:id', function(request, response){
+    try {
+        var id = request.params.id;
+        var path = listOfTorrents.id;
+        var torrent = client.get(fs.readFileSync(listOfTorrents.id));
+        var file = getLargestFile(torrent);
+        var total = file.length;
+        var extension = file.name.split('.').pop();
+        console.log(extension);
+
+        if(typeof request.headers.range != 'undefined') {
+            var range = request.headers.range;
+            var parts = range.replace(/bytes=/, "").split("-");
+            var partialstart = parts[0];
+            var partialend = parts[1];
+            var start = parseInt(partialstart, 10);
+            var end = partialend ? parseInt(partialend, 10) : total - 1;
+            var chunksize = (end - start) + 1;
+        } else {
+            var start = 0; var end = total;
+        }
+
+        var stream = file.createReadStream({start: start, end: end});
+
+
+         var stream = file.createReadStream({start: start, end: end});
+         response.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': chunksize, 'Content-Type': 'video/mp4' });
+         stream.pipe(response);
+
+
+    } catch (err) {
+        response.status(500).send('Error: ' + err.toString());
+        console.log('getting stream failed' + err.toString());
+    }
+
+
+});*/
+
+app.get('/streamtorrent/:id.webm', function(request, response){
+
+    console.log('falling back to webm');
+    /*response.writeHead(200, {
+      'Content-Type': 'video/webm'*/
+    //});
+
+    // Start ffmpeg
+    var ffmpeg = child_process.spawn("ffmpeg", [
+        // Real time mode
+        // "-re",
+
+        // Source
+        "-i", 'http://localhost:' + port + '/filetotranscode/' + request.params.id,
+
+        // Map multiple streams
+        "-map", "0:0", "-map", "0:1", "-map", "0:1",
+
+        // Some optimizations
+        // "-preset","ultrafast",
+        // "-tune","zerolatency",
+
+        // Motion algorithms off
+        // "-me_method","zero",
+        // "-flags2","fast",
+
+        // Quantization
+         "-qmin","0",
+         "-qmax","42",
+
+        // Video: VP8 encoding
+        "-c:v","libvpx",
+        // quality
+        //"-crf","10",
+        // target bit rate
+        "-b:v","4M",
+
+        // Audio: Vorbis  encoding
+        "-c:a","libvorbis",
+        // target bit rate
+        "-b:a","256K",
+
+        // Subtitles: copy
+        "-c:s","copy",
+        "-quality","good",
+        "-cpu-used","0",
+        "-threads","4",
+
+        // File format
+        "-f","webm",
+
+        // Output to STDOUT
+        "-"
+    ]);
+
+
+
+    //response.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': chunksize, 'Content-Type': 'video/mp4' });
+    // Pipe the video output to the client response
+    ffmpeg.stdout.pipe(response, {end:true});
+    ffmpeg.stderr.on('data', (data) => {
+         console.log(`stderr: ${data}`);
+    });
+
+    // Kill the subprocesses when client disconnects
+    response.on("close", function(){
+        ffmpeg.kill();
+    })
+
+});
+app.get('/filetotranscode/:id', function(request, response){
+    try {
+        var id = request.params.id;
+        var path = listOfTorrents.id;
+        var torrent = client.get(fs.readFileSync(listOfTorrents.id));
+        var file = getLargestFile(torrent);
+        var total = file.length;
+        var extension = file.name.split('.').pop();
+        console.log(extension);
+        console.log(file.name);
+
+
+        if(typeof request.headers.range != 'undefined') {
+            var range = request.headers.range;
+            var parts = range.replace(/bytes=/, "").split("-");
+            var partialstart = parts[0];
+            var partialend = parts[1];
+            var start = parseInt(partialstart, 10);
+            var end = partialend ? parseInt(partialend, 10) : total - 1;
+            var chunksize = (end - start) + 1;
+        } else {
+            var start = 0; var end = total;
+        }
+
+        var stream = file.createReadStream({start: start, end: end});
+
+        var stream = file.createReadStream({start: start, end: end});
+        response.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': chunksize });
+        stream.pipe(response);
+
+
+    } catch (err) {
+        response.status(500).send('Error: ' + err.toString());
+        console.log('getting stream failed' + err.toString());
+    }
+});
 
 app.get('/streamtorrent/:id.mp4', function(request, response){
     try {
@@ -80,6 +225,8 @@ app.get('/streamtorrent/:id.mp4', function(request, response){
         var file = getLargestFile(torrent);
         var total = file.length;
         var extension = file.name.split('.').pop();
+        console.log(extension);
+        console.log(file.name);
 
 
         if(typeof request.headers.range != 'undefined') {
@@ -97,22 +244,8 @@ app.get('/streamtorrent/:id.mp4', function(request, response){
         var stream = file.createReadStream({start: start, end: end});
 
         if(extension != "mp4") {
-            var stream = file.createReadStream();
-            var ExecConfig = "";
-            var output = '/var/www/rufy/nodejs/assets/transcoded_' + file.name;
-            var input = file.createReadStream({start:start, end: end});
-            var trans = new Transcoder(stream)
-                .videoCodec('h264')
-                .format('mp4')
-                .custom('strict', 'experimental')
-                .on('finish', function(){
-                    console.log('finished transcoding');
-                })
-                .on('error', function(err){
-                    console.log('transcoding error: %o', err);
-                });
-            response.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': chunksize, 'Content-Type': 'video/mp4' });
-            trans.stream().pipe(response);
+            response.status(404).send('not an mp4, falling back to webm');
+            return;
             //var stream = fs.createReadStream(output, {start:start});
         }
         else {
