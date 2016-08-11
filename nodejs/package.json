@@ -25,6 +25,7 @@
     "stream-transcoder": "0.0.5",
     "tap": "^6.2.0",
     "torrent-stream": "^1.0.3",
+    "tree-kill": "^1.1.0",
     "webtorrent": "^0.95.5"
   }
 }

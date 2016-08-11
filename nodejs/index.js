@@ -5,7 +5,7 @@ var http = require('http');
 var app = express();
 var bodyParser = require("body-parser");
 var fs = require('fs');
-
+var kill = require('tree-kill');
 child_process = require("child_process");
 var port = 3000;
 
@@ -49,10 +49,12 @@ app.post('/streamtorrent/add', function(request, response, next) {
             response.status(500).send('Missing torrent info in request!');
             return;
         }
-        var id = request.body.id;
-        if (listOfTorrents.id !== undefined) {
+	var id = '';
+        id = request.body.id;
+        if (listOfTorrents[id] !== undefined) {
             console.log("torrent not added, because it seems to already exist");
-            response.status(200).send("torrent already exists, skipping...");
+            console.log(listOfTorrents[id]);
+		response.status(200).send('torrent with id ' + id +'already exists, skipping...');
             return;
         }
         torrentID = fs.readFileSync(request.body.torrent);
@@ -60,14 +62,15 @@ app.post('/streamtorrent/add', function(request, response, next) {
             var file = getLargestFile(torrent);
             torrent.swarm.on('upload', function() {
                 if (torrent.length == torrent.downloaded) {
-                    torrent.swarm.destroy();
-                    torrent.discovery.stop();
-                    delete listOfTorrents.id;
+                    torrent.destroy();
+                    //torrent.discovery.stop();
+                    delete listOfTorrents[id];
                 }
 
             });
-            var id = request.body.id;
-            listOfTorrents.id = request.body.torrent;
+            var id = '';
+	    id = request.body.id;
+            listOfTorrents[id] = request.body.torrent;
             response.status(200).send('Added torrent!');
         });
         console.log("Torrent added");
@@ -117,9 +120,10 @@ app.post('/streamtorrent/add', function(request, response, next) {
 
 app.get('/filetotranscode/:id', function(request, response) {
     try {
-        var id = request.params.id;
-        var path = listOfTorrents.id;
-        var torrent = client.get(fs.readFileSync(listOfTorrents.id));
+        var id = ''; 
+	id = request.params.id;
+        var path = listOfTorrents[id];
+        var torrent = client.get(fs.readFileSync(listOfTorrents[id]));
         var file = getLargestFile(torrent);
         var total = file.length;
         var extension = file.name.split('.').pop();
@@ -154,7 +158,7 @@ app.get('/filetotranscode/:id', function(request, response) {
 function fullEncode(port, id) {
     return child_process.spawn("ffmpeg", [
                 // Real time mode
-                 "-re",
+                 //"-re",
 
                 // Source
                 "-i", 'http://localhost:' + port + '/filetotranscode/' + id,
@@ -208,7 +212,7 @@ function fullEncode(port, id) {
 function repackOnly(port, id) {
     return child_process.spawn("ffmpeg", [
                 // Real time mode
-                "-re",
+                //"-re",
 
                 // Source
                 "-i", 'http://localhost:' + port + '/filetotranscode/' + id,
@@ -263,7 +267,7 @@ function repackOnly(port, id) {
 function keepAudioCodec(port, id){
     return child_process.spawn("ffmpeg", [
                 // Real time mode
-                "-re",
+                //"-re",
 
                 // Source
                 "-i", 'http://localhost:' + port + '/filetotranscode/' + id,
@@ -317,7 +321,7 @@ function keepAudioCodec(port, id){
 function keepVideoCodec(port, id) {
     return child_process.spawn("ffmpeg", [
                 // Real time mode
-                 "-re",
+                 //"-re",
 
                 // Source
                 "-i", 'http://localhost:' + port + '/filetotranscode/' + id,
@@ -385,9 +389,10 @@ function startFFMPEG(videoCodec, audioCodec, port, id) {
 }
 app.get('/streamtorrent/:id.mp4', function(request, response) {
     try {
-        var id = request.params.id;
-        var path = listOfTorrents.id;
-        var torrent = client.get(fs.readFileSync(listOfTorrents.id));
+	var id = '';
+        id = request.params.id;
+        var path = listOfTorrents[id];
+        var torrent = client.get(fs.readFileSync(listOfTorrents[id]));
         var file = getLargestFile(torrent);
         var total = file.length;
         var extension = file.name.split('.').pop();
@@ -437,8 +442,8 @@ app.get('/streamtorrent/:id.mp4', function(request, response) {
                     console.log(`stderr: ${data}`);
                 });
                 response.on("close", function() {
-                    console.log("killing ffmpeg ")
-                    ffmpeg.kill();
+                    console.log('killing ffmpeg :  ' + ffmpeg.pid);
+                    kill(ffmpeg.pid, 'SIGKILL');
                 });
              });
 
@@ -471,18 +476,15 @@ app.get('/delete/:id', function(request, response) {
         return;
     }
     try {
-        var id = request.params.id;
-        var torrent = client.remove(fs.readFileSync(listOfTorrents.id));
-        console.log('Removed torrent' + listOfTorrents.id);
-        delete listOfTorrents.id;
-        response.status(200).send('Removed torrent ' + listOfTorrents.id);
-        if(CurrentTranscodings.id) {
-            var ffmpeg = CurrentTranscodings.id;
-            ffmpeg.kill();
-            }
+	var id = '';
+        id = request.params.id;
+        var torrent = client.remove(fs.readFileSync(listOfTorrents[id]));
+        console.log('Removed torrent' + listOfTorrents[id]);
+        delete listOfTorrents[id];
+        response.status(200).send('Removed torrent ' + listOfTorrents[id]);
 
     } catch (err) {
-        response.status(500).send('Error : ' + err.toString() + listOfTorrents.id);
+        response.status(500).send('Error : ' + err.toString() + listOfTorrents[id]);
         console.log('Removing torrent error : ' + err.toString());
     }
 });
