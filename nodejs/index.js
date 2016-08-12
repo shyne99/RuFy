@@ -7,7 +7,10 @@ var bodyParser = require("body-parser");
 var fs = require('fs');
 var kill = require('tree-kill');
 child_process = require("child_process");
+var io = require('socket.io');
 var port = 3000;
+var ptn = require('parse-torrent-name');
+var mdb = require('moviedb')('a67e04d0f91fb623fbd11822f1928685');
 
 var client = new webtorrent();
 var quality = 'high';
@@ -49,12 +52,12 @@ app.post('/streamtorrent/add', function(request, response, next) {
             response.status(500).send('Missing torrent info in request!');
             return;
         }
-	var id = '';
+        var id = '';
         id = request.body.id;
         if (listOfTorrents[id] !== undefined) {
             console.log("torrent not added, because it seems to already exist");
             console.log(listOfTorrents[id]);
-		response.status(200).send('torrent with id ' + id +'already exists, skipping...');
+            response.status(200).send('torrent with id ' + id + 'already exists, skipping...');
             return;
         }
         torrentID = fs.readFileSync(request.body.torrent);
@@ -69,7 +72,7 @@ app.post('/streamtorrent/add', function(request, response, next) {
 
             });
             var id = '';
-	    id = request.body.id;
+            id = request.body.id;
             listOfTorrents[id] = request.body.torrent;
             response.status(200).send('Added torrent!');
         });
@@ -120,8 +123,8 @@ app.post('/streamtorrent/add', function(request, response, next) {
 
 app.get('/filetotranscode/:id', function(request, response) {
     try {
-        var id = ''; 
-	id = request.params.id;
+        var id = '';
+        id = request.params.id;
         var path = listOfTorrents[id];
         var torrent = client.get(fs.readFileSync(listOfTorrents[id]));
         var file = getLargestFile(torrent);
@@ -155,241 +158,245 @@ app.get('/filetotranscode/:id', function(request, response) {
         console.log('getting stream failed' + err.toString());
     }
 });
+
 function fullEncode(port, id) {
     return child_process.spawn("ffmpeg", [
-                // Real time mode
-                 //"-re",
+        // Real time mode
+        //"-re",
 
-                // Source
-                "-i", 'http://localhost:' + port + '/filetotranscode/' + id,
+        // Source
+        "-i", 'http://127.0.0.1:' + port + '/filetotranscode/' + id,
 
-                // Map multiple streams
-                //"-map", "0:0", "-map", "0:1", "-map", "0:1",
-                "-profile:v","high",
+        // Map multiple streams
+        //"-map", "0:0", "-map", "0:1", "-map", "0:1",
+        "-profile:v", "high",
 
-                "-c:a","aac",
+        "-c:a", "aac",
 
-                "-crf","18",
-                "-c:v", "libx264",
-                "-movflags","frag_keyframe+empty_moov",
-                // Some optimizations
-                 "-preset","ultrafast",
-                // "-tune","zerolatency",
+        "-crf", "18",
+        "-c:v", "libx264",
+        "-movflags", "frag_keyframe+empty_moov",
+        // Some optimizations
+        "-preset", "ultrafast",
+        // "-tune","zerolatency",
 
-                // Motion algorithms off
-                // "-me_method","zero",
-                // "-flags2","fast",
+        // Motion algorithms off
+        // "-me_method","zero",
+        // "-flags2","fast",
 
-                // Quantization
-                //"-qmin", "0",
-                //"-qmax", "42",
+        // Quantization
+        //"-qmin", "0",
+        //"-qmax", "42",
 
-                // Video: VP8 encoding
-                //"-c:v", "libvpx",
-                // quality
+        // Video: VP8 encoding
+        //"-c:v", "libvpx",
+        // quality
 
-                // target bit rate
-                //"-b:v", "4M",
+        // target bit rate
+        //"-b:v", "4M",
 
-                // Audio: Vorbis  encoding
-                //"-c:a", "libvorbis",
-                // target bit rate
-                //"-b:a", "256K",
+        // Audio: Vorbis  encoding
+        //"-c:a", "libvorbis",
+        // target bit rate
+        //"-b:a", "256K",
 
-                // Subtitles: copy
-                //"-c:s", "copy",
-                //"-quality", "good",
-                //"-cpu-used", "0",
-                "-threads", "0",
-                //"-preset","ultrafast",
-                // File format
-                "-f", "mp4",
+        // Subtitles: copy
+        //"-c:s", "copy",
+        //"-quality", "good",
+        //"-cpu-used", "0",
+        "-threads", "0",
+        //"-preset","ultrafast",
+        // File format
+        "-f", "mp4",
 
-                // Output to STDOUT
-                "-"
-            ]);
+        // Output to STDOUT
+        "-"
+    ]);
 }
+
 function repackOnly(port, id) {
     return child_process.spawn("ffmpeg", [
-                // Real time mode
-                //"-re",
+        // Real time mode
+        //"-re",
 
-                // Source
-                "-i", 'http://localhost:' + port + '/filetotranscode/' + id,
-                "-vcodec","copy",
-                "-acodec","copy",
-                // Map multiple streams
-                //"-map", "0:0", "-map", "0:1", "-map", "0:1",
-                //"-profile:v","high",
+        // Source
+        "-i", 'http://127.0.0.1:' + port + '/filetotranscode/' + id,
+        "-vcodec", "copy",
+        "-acodec", "copy",
+        // Map multiple streams
+        //"-map", "0:0", "-map", "0:1", "-map", "0:1",
+        //"-profile:v","high",
 
-                //"-c:a","aac",
+        //"-c:a","aac",
 
-                //"-crf","18",
-                //"-c:v", "libx264",
-                "-movflags","frag_keyframe+empty_moov",
-                // Some optimizations
-                 //"-preset","ultrafast",
-                // "-tune","zerolatency",
+        //"-crf","18",
+        //"-c:v", "libx264",
+        "-movflags", "frag_keyframe+empty_moov",
+        // Some optimizations
+        //"-preset","ultrafast",
+        // "-tune","zerolatency",
 
-                // Motion algorithms off
-                // "-me_method","zero",
-                // "-flags2","fast",
+        // Motion algorithms off
+        // "-me_method","zero",
+        // "-flags2","fast",
 
-                // Quantization
-                //"-qmin", "0",
-                //"-qmax", "42",
+        // Quantization
+        //"-qmin", "0",
+        //"-qmax", "42",
 
-                // Video: VP8 encoding
-                //"-c:v", "libvpx",
-                // quality
+        // Video: VP8 encoding
+        //"-c:v", "libvpx",
+        // quality
 
-                // target bit rate
-                //"-b:v", "4M",
+        // target bit rate
+        //"-b:v", "4M",
 
-                // Audio: Vorbis  encoding
-                //"-c:a", "libvorbis",
-                // target bit rate
-                //"-b:a", "256K",
+        // Audio: Vorbis  encoding
+        //"-c:a", "libvorbis",
+        // target bit rate
+        //"-b:a", "256K",
 
-                // Subtitles: copy
-                //"-c:s", "copy",
-                //"-quality", "good",
-                //"-cpu-used", "0",
-                "-threads", "0",
-                //"-preset","ultrafast",
-                // File format
-                "-f", "mp4",
+        // Subtitles: copy
+        //"-c:s", "copy",
+        //"-quality", "good",
+        //"-cpu-used", "0",
+        "-threads", "0",
+        //"-preset","ultrafast",
+        // File format
+        "-f", "mp4",
 
-                // Output to STDOUT
-                "-"
-            ]);
+        // Output to STDOUT
+        "-"
+    ]);
 }
-function keepAudioCodec(port, id){
+
+function keepAudioCodec(port, id) {
     return child_process.spawn("ffmpeg", [
-                // Real time mode
-                //"-re",
+        // Real time mode
+        //"-re",
 
-                // Source
-                "-i", 'http://localhost:' + port + '/filetotranscode/' + id,
+        // Source
+        "-i", 'http://127.0.0.1:' + port + '/filetotranscode/' + id,
 
-                // Map multiple streams
-                //"-map", "0:0", "-map", "0:1", "-map", "0:1",
-                "-profile:v","high",
+        // Map multiple streams
+        //"-map", "0:0", "-map", "0:1", "-map", "0:1",
+        "-profile:v", "high",
 
-                "-acodec","copy",
+        "-acodec", "copy",
 
-                "-crf","18",
-                "-c:v", "libx264",
-                "-movflags","frag_keyframe+empty_moov",
-                // Some optimizations
-                 "-preset","ultrafast",
-                // "-tune","zerolatency",
+        "-crf", "18",
+        "-c:v", "libx264",
+        "-movflags", "frag_keyframe+empty_moov",
+        // Some optimizations
+        "-preset", "ultrafast",
+        // "-tune","zerolatency",
 
-                // Motion algorithms off
-                // "-me_method","zero",
-                // "-flags2","fast",
+        // Motion algorithms off
+        // "-me_method","zero",
+        // "-flags2","fast",
 
-                // Quantization
-                //"-qmin", "0",
-                //"-qmax", "42",
+        // Quantization
+        //"-qmin", "0",
+        //"-qmax", "42",
 
-                // Video: VP8 encoding
-                //"-c:v", "libvpx",
-                // quality
+        // Video: VP8 encoding
+        //"-c:v", "libvpx",
+        // quality
 
-                // target bit rate
-                //"-b:v", "4M",
+        // target bit rate
+        //"-b:v", "4M",
 
-                // Audio: Vorbis  encoding
-                //"-c:a", "libvorbis",
-                // target bit rate
-                //"-b:a", "256K",
+        // Audio: Vorbis  encoding
+        //"-c:a", "libvorbis",
+        // target bit rate
+        //"-b:a", "256K",
 
-                // Subtitles: copy
-                //"-c:s", "copy",
-                //"-quality", "good",
-                //"-cpu-used", "0",
-                "-threads", "0",
-                //"-preset","ultrafast",
-                // File format
-                "-f", "mp4",
+        // Subtitles: copy
+        //"-c:s", "copy",
+        //"-quality", "good",
+        //"-cpu-used", "0",
+        "-threads", "0",
+        //"-preset","ultrafast",
+        // File format
+        "-f", "mp4",
 
-                // Output to STDOUT
-                "-"
-            ]);
+        // Output to STDOUT
+        "-"
+    ]);
 }
+
 function keepVideoCodec(port, id) {
     return child_process.spawn("ffmpeg", [
-                // Real time mode
-                 //"-re",
+        // Real time mode
+        //"-re",
 
-                // Source
-                "-i", 'http://localhost:' + port + '/filetotranscode/' + id,
-                "-vcodec","copy",
-                // Map multiple streams
-                //"-map", "0:0", "-map", "0:1", "-map", "0:1",
-                //"-profile:v","high",
+        // Source
+        "-i", 'http://127.0.0.1:' + port + '/filetotranscode/' + id,
+        "-vcodec", "copy",
+        // Map multiple streams
+        //"-map", "0:0", "-map", "0:1", "-map", "0:1",
+        //"-profile:v","high",
 
-                "-c:a","aac",
+        "-c:a", "aac",
 
-                //"-crf","18",
-                //"-c:v", "libx264",
-                "-movflags","frag_keyframe+empty_moov",
-                // Some optimizations
-                 //"-preset","ultrafast",
-                // "-tune","zerolatency",
+        //"-crf","18",
+        //"-c:v", "libx264",
+        "-movflags", "frag_keyframe+empty_moov",
+        // Some optimizations
+        //"-preset","ultrafast",
+        // "-tune","zerolatency",
 
-                // Motion algorithms off
-                // "-me_method","zero",
-                // "-flags2","fast",
+        // Motion algorithms off
+        // "-me_method","zero",
+        // "-flags2","fast",
 
-                // Quantization
-                //"-qmin", "0",
-                //"-qmax", "42",
+        // Quantization
+        //"-qmin", "0",
+        //"-qmax", "42",
 
-                // Video: VP8 encoding
-                //"-c:v", "libvpx",
-                // quality
+        // Video: VP8 encoding
+        //"-c:v", "libvpx",
+        // quality
 
-                // target bit rate
-                //"-b:v", "4M",
+        // target bit rate
+        //"-b:v", "4M",
 
-                // Audio: Vorbis  encoding
-                //"-c:a", "libvorbis",
-                // target bit rate
-                //"-b:a", "256K",
+        // Audio: Vorbis  encoding
+        //"-c:a", "libvorbis",
+        // target bit rate
+        //"-b:a", "256K",
 
-                // Subtitles: copy
-                //"-c:s", "copy",
-                //"-quality", "good",
-                //"-cpu-used", "0",
-                "-threads", "0",
-                //"-preset","ultrafast",
-                // File format
-                "-f", "mp4",
+        // Subtitles: copy
+        //"-c:s", "copy",
+        //"-quality", "good",
+        //"-cpu-used", "0",
+        "-threads", "0",
+        //"-preset","ultrafast",
+        // File format
+        "-f", "mp4",
 
-                // Output to STDOUT
-                "-"
-            ]);
+        // Output to STDOUT
+        "-"
+    ]);
 }
+
 function startFFMPEG(videoCodec, audioCodec, port, id) {
-    if (videoCodec ==='h264') {
-        if(audioCodec ==='mp3' || audioCodec ==='aac')
+    if (videoCodec === 'h264') {
+        if (audioCodec === 'mp3' || audioCodec === 'aac')
             return repackOnly(port, id);
-         else
+        else
             return keepVideoCodec(port, id);
-    }
-    else {
-        if(audioCodec ==='mp3' || audioCodec ==='aac')
+    } else {
+        if (audioCodec === 'mp3' || audioCodec === 'aac')
             return keepAudioCodec(port, id);
-         else
+        else
             return fullEncode(port, id);
     }
 
 }
 app.get('/streamtorrent/:id.mp4', function(request, response) {
     try {
-	var id = '';
+        var id = '';
         id = request.params.id;
         var path = listOfTorrents[id];
         var torrent = client.get(fs.readFileSync(listOfTorrents[id]));
@@ -416,47 +423,39 @@ app.get('/streamtorrent/:id.mp4', function(request, response) {
         var stream = file.createReadStream({ start: start, end: end });
 
         if (extension != "mp4") {
-            var url = 'http://localhost:' + port + '/filetotranscode/' + request.params.id +'';
+            var url = 'http://localhost:' + port + '/filetotranscode/' + request.params.id + '';
 
-             require('fluent-ffmpeg').ffprobe(url, function(err, metadata){
+            require('fluent-ffmpeg').ffprobe(url, function(err, metadata) {
 
                 var audioCodec = null;
                 var videoCodec = null;
-                metadata.streams.forEach(function(stream){
-                if (stream.codec_type === "video"){
-                    videoCodec = stream.codec_name;
-                    console.log(stream);
-                    }
-                else if (stream.codec_type === "audio")
-                    audioCodec = stream.codec_name;
+                metadata.streams.forEach(function(stream) {
+                    if (stream.codec_type === "video") {
+                        videoCodec = stream.codec_name;
+                        console.log(stream);
+                    } else if (stream.codec_type === "audio")
+                        audioCodec = stream.codec_name;
                 });
 
 
                 console.log("Video codec: %s\nAudio codec: %s", videoCodec, audioCodec);
                 var ffmpeg = startFFMPEG(videoCodec, audioCodec, port, id);
                 CurrentTranscodings.id = ffmpeg;
-                    //response.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': chunksize, 'Content-Type': 'video/mp4' });
-                    // Pipe the video output to the client response
-                ffmpeg.stdout.pipe(response/*, { end: true }*/);
-                ffmpeg.stderr.on('data', (data) => {
+                //response.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': chunksize, 'Content-Type': 'video/mp4' });
+                // Pipe the video output to the client response
+                ffmpeg.stdout.pipe(response /*, { end: true }*/ );
+                /*ffmpeg.stderr.on('data', (data) => {
                     console.log(`stderr: ${data}`);
-                });
+                });*/
                 response.on("close", function() {
                     console.log('killing ffmpeg :  ' + ffmpeg.pid);
                     kill(ffmpeg.pid, 'SIGKILL');
                 });
-             });
-
-
-
-
-
-
-
+            });
 
             // Kill the subprocesses when client disconnects
 
-                //var stream = fs.createReadStream(output, {start:start});*/
+            //var stream = fs.createReadStream(output, {start:start});*/
         } else {
             var stream = file.createReadStream({ start: start, end: end });
             response.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': chunksize, 'Content-Type': 'video/mp4' });
@@ -476,7 +475,7 @@ app.get('/delete/:id', function(request, response) {
         return;
     }
     try {
-	var id = '';
+        var id = '';
         id = request.params.id;
         var torrent = client.remove(fs.readFileSync(listOfTorrents[id]));
         console.log('Removed torrent' + listOfTorrents[id]);
@@ -492,4 +491,40 @@ app.get('/delete/:id', function(request, response) {
 var server = http.createServer(app);
 server.listen(port, function() {
     console.log('Listening on http://127.0.0.1:' + port);
+});
+
+io = io.listen(server);
+
+io.on('connection', function (socket){
+    console.log("client socket up and running");
+    socket.on('getMeta', function(msg){
+        try {
+            var meta = ptn(msg);
+            var typeOfTorrent = '';
+            if(meta.season) {
+                typeOfTorrent = 'TV';
+                }
+            else {
+                typeOfTorrent = 'Movie';
+            }
+            console.log(meta);
+            console.log('torrentname parsed : ' + meta.title);
+            //mdb.configuration(function(err, res){});
+
+            if(typeOfTorrent == 'Movie') {
+
+                mdb.searchMovie({query : meta.title, year : meta.year, language : 'en'}, function(err, res){
+                    var item = res.results[0];
+                    //var title = item.title;
+                    console.log(item);
+
+                });
+
+            }
+        }
+        catch(err) {
+            console.log('error trying to recover metadata from TMDB: ' + err);
+        }
+
+    });
 });

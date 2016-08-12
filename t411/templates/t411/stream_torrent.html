@@ -8,8 +8,13 @@
     <script>
         $(window).load(function () {
 
+
+
+
             var ip = '{{ ip_address }}';
             var api = 'http://' + ip + ':3000/';
+            var socket = io.connect(api);
+            socket.emit('getMeta', '{{nomFichier}}');
             var player = document.querySelector('#player');
             plyr.setup(player);
             $.post(api + 'streamtorrent/add', { torrent : "{{ chemin }}", id : {{ id_torrent }} }).done( function( data ){
