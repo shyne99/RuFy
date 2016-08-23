@@ -1,8 +1,6 @@
+
 {% extends "base.html" %}
 {% block content %}
- <h3>Streaming torrent</h3>
-<p>
-
 
 <center>
     <script>
@@ -14,9 +12,14 @@
             var ip = '{{ ip_address }}';
             var api = 'http://' + ip + ':3000/';
             var socket = io.connect(api);
-            socket.emit('getMeta', '{{nomFichier}}');
+            socket.emit('getMeta', {filename : '{{nomFichier}}', id_torrent : '{{id_torrent}}'});
             var player = document.querySelector('#player');
             plyr.setup(player);
+            socket.on('background-player', function(msg){
+                console.log('receiving metadata from tmdb : '+msg);
+               document.getElementsByTagName("video")[0].setAttribute("poster", 'http://image.tmdb.org/t/p/w500' + msg);
+                $('.video').show();
+            });
             $.post(api + 'streamtorrent/add', { torrent : "{{ chemin }}", id : {{ id_torrent }} }).done( function( data ){
                     setTimeout(function(){
                         var videomp4 = api + 'streamtorrent/' + '{{id_torrent}}' + '.mp4';
@@ -37,7 +40,8 @@
                 console.log("removed torrent");
             });
         });
-        player.play();
+        $('.video').play();
+
 
     </script>
 

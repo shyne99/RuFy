@@ -9,8 +9,11 @@ var kill = require('tree-kill');
 child_process = require("child_process");
 var io = require('socket.io');
 var port = 3000;
-var ptn = require('parse-torrent-name');
-var mdb = require('moviedb')('a67e04d0f91fb623fbd11822f1928685');
+var guess = require('guessit-wrapper');
+var tmdb = require('tmdbv3').init('a67e04d0f91fb623fbd11822f1928685');
+tmdb.setLanguage('fr');
+
+
 
 var client = new webtorrent();
 var quality = 'high';
@@ -450,6 +453,9 @@ app.get('/streamtorrent/:id.mp4', function(request, response) {
                 response.on("close", function() {
                     console.log('killing ffmpeg :  ' + ffmpeg.pid);
                     kill(ffmpeg.pid, 'SIGKILL');
+                    torrent.destroy(function(){
+                        console.log("torrent succesfully removed");
+                    })
                 });
             });
 
@@ -499,31 +505,24 @@ io.on('connection', function (socket){
     console.log("client socket up and running");
     socket.on('getMeta', function(msg){
         try {
-            var meta = ptn(msg);
-            var typeOfTorrent = '';
-            if(meta.season) {
-                typeOfTorrent = 'TV';
-                }
-            else {
-                typeOfTorrent = 'Movie';
-            }
-            console.log(meta);
-            console.log('torrentname parsed : ' + meta.title);
-            //mdb.configuration(function(err, res){});
-
-            if(typeOfTorrent == 'Movie') {
-
-                mdb.searchMovie({query : meta.title, year : meta.year, language : 'en'}, function(err, res){
-                    var item = res.results[0];
-                    //var title = item.title;
-                    console.log(item);
-
+	    var filenameWithExt = msg.filename;
+            var filename = filenameWithExt.substr(0, filenameWithExt.lastIndexOf('.'));             // on enlève l'extension du fichier, car guess ne marche pas sinon
+            guess.parseName(filename).then(function(data){                  // Devine le titre du film ou de la serie, fonction du nom de fichier
+                var typeOfTorrent = data.type;                              // affichage du type (movie or episode)
+                console.log(data);                                          //affichage complet de la sortie de guess-it
+                console.log('torrentname parsed : ' + data.title);          //affichage du titre devviné
+                tmdb.search.movie(data.title, function(err,res){            //on recherche sur tmdb le titre
+                    if(res.results[0]) {                                    //si il ya un resultat
+                        var backdrop_path = res.results[0].backdrop_path;   //on extrait le chemin de l'image
+                        console.log('emmiting backdrop');
+                        io.emit('background-player', backdrop_path);        //envoie du chemin de l'image au client
+                    }
                 });
-
-            }
+            });
+            
         }
         catch(err) {
-            console.log('error trying to recover metadata from TMDB: ' + err);
+            console.log('error trying to recover metadata from IMDB: ' + err);
         }
 
     });
