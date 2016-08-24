@@ -24,7 +24,6 @@
   <body>
 {% block content %}
 
-
 <center>
     <script>
         $(window).load(function () {
@@ -38,10 +37,11 @@
             socket.emit('getMeta', {filename : '{{nomFichier}}', id_torrent : '{{id_torrent}}'});
             var player = document.querySelector('#player');
             plyr.setup(player);
+            $('.video').show();
+
             socket.on('background-player', function(msg){
                 console.log('receiving metadata from tmdb : '+msg);
                document.getElementsByTagName("video")[0].setAttribute("poster", 'http://image.tmdb.org/t/p/w500' + msg);
-                $('.video').show();
             });
             $.post(api + 'streamtorrent/add', { torrent : "{{ chemin }}", id : {{ id_torrent }} }).done( function( data ){
                     setTimeout(function(){
@@ -70,18 +70,9 @@
 
 
 
-        <div class="video" style="
-    position:fixed;
-    width:100%;
-    height:100%;
-    top:0px;
-    left:0px;
-    z-index:1000;">
-            <video class="player" autoplay preload="none" controls crossorigin id="player"   style="background:black">
+            <video class="player" autoplay preload="none" controls crossorigin id="player"   style="position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; width: auto; height: auto; z-index: -100; background: url(polina.jpg) no-repeat; background-size: cover;background-color:black; "
 
             </video>
-
-        </div>
 </center>
 <script src="https://cdn.plyr.io/1.8.12/plyr.js"></script>
 
