@@ -1,5 +1,5 @@
-﻿#!/bin/sh
-addgroup -g ${GID} rufy && adduser -h /var/www/RuFy -s /bin/sh -D -G rufy -u ${UID} rufy
+﻿#!/bin/bash
+groupadd -g ${GID} rufy && useradd -M -d /var/www/RuFy -s /bin/sh -G rufy -u ${UID} rufy
 
 if [ $WEBROOT != "/" ]; then
     sed -i 's|<webroot>|'${WEBROOT}\/'|g' /etc/nginx/nginx.conf

@@ -21,22 +21,19 @@ LABEL description="RuFy based on alpine" \
       build_ver="2016050301"
 
 RUN export BUILD_DEPS="git \
-                build-base \
                 libffi-dev \
-                linux-headers \
-                openssl-dev \
-                py-pip \
-                python-dev" \ &&
-	export MAKEFLAGS="-j$[$(nproc) +1]" 
-    && apt install python \
+                python-dev"  && \
+	export MAKEFLAGS="-j$[$(nproc) +1]" \
+    && apt-get update \ 
+    && apt-get install -y python \
 		python-pip \
 		python-dev \
                 supervisor \
                 nginx \
                 nodejs \
-                su-exec \
+		build-essential \
                 ${BUILD_DEPS} \
-    && apt install -yq --no-install-recommends \
+    && apt-get install -yq --no-install-recommends \
         autoconf \
         automake \
         bzip2 \
@@ -238,15 +235,15 @@ RUN export BUILD_DEPS="git \
         zlib1g-dev && \
         apt-get autoremove -y && \
         apt-get clean -y && \
-        rm -rf /var/lib/apt/lists && \
         ffmpeg -buildconf \
-	
+    && apt-get install -y git python supervisor python-pip python-dev curl \
+    && curl -sL https://deb.nodesource.com/setup_4.x |bash - \
+    && apt-get install -y nodejs \
     && pip --no-cache-dir install virtualenv \
     && git clone https://github.com/shyne99/RuFy.git --branch transcode --single-branch /var/www/RuFy \
     && virtualenv --no-site-packages -p python2.7 /var/www/RuFy/venv \
     && /var/www/RuFy/venv/bin/pip install \
                     -r /var/www/RuFy/requirements.txt \
-	&& apk del ${BUILD_DEPS} \
     && rm -rf /var/cache/apk/*
 
 COPY rootfs /
